@@ -3,6 +3,7 @@ package ktp.fr
 import io.ktor.server.application.*
 import io.ktor.server.engine.*
 import io.ktor.server.netty.*
+import ktp.fr.data.model.dao.DatabaseFactory
 import ktp.fr.plugins.*
 
 fun main() {
@@ -11,6 +12,7 @@ fun main() {
 }
 
 fun Application.module() {
+    DatabaseFactory.init()
     configureSerialization()
     configureRouting()
 }
