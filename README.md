@@ -6,12 +6,11 @@
 ## General info
 This project build with Ktor is the backEnd for [Svelty](https://github.com/AlexKTP/Svelty) (A minimal weight tracker / Flutter Project).
 
-q
 ## Technologies
 Project is created with:
 
 ###Exposed 
->You can check out the wiki [here](https://www.h2database.com/html/quickstart.html)
+>You can check out the wiki [here](https://github.com/JetBrains/Exposed/wiki/Getting-Started)
 
 Exposed is a lightweight SQL library for Kotlin that provides a simple and intuitive way to work with SQL databases. With Exposed, you can define database tables, insert and update data, and run complex queries using Kotlin code, without having to write raw SQL statements. Exposed supports a wide range of SQL databases, including H2, MySQL, PostgreSQL, and SQLite, and is designed to work seamlessly with the Kotlin programming language.
 
