@@ -1,38 +1,123 @@
 package ktp.fr.plugins
 
+import com.auth0.jwt.JWT
+import com.auth0.jwt.algorithms.Algorithm
 import io.ktor.http.*
-import io.ktor.server.routing.*
-import io.ktor.server.response.*
 import io.ktor.server.application.*
 import io.ktor.server.request.*
+import io.ktor.server.response.*
+import io.ktor.server.routing.*
+import ktp.fr.data.model.Hero
 import ktp.fr.data.model.Track
 import ktp.fr.data.model.dao.DAOFacade
 import ktp.fr.data.model.dao.DAOFacadeImpl
+import ktp.fr.utils.hashPassword
+import java.util.*
 
 fun Application.configureRouting() {
 
     val dao: DAOFacade = DAOFacadeImpl()
 
+    val secret = environment.config.property("jwt.secret").getString()
+    val issuer = environment.config.property("jwt.issuer").getString()
+    fun generateToken(login: String): String = JWT.create()
+        .withIssuer(issuer)
+        .withClaim("login", login)
+        .withExpiresAt(Date(System.currentTimeMillis() + 60000))
+        .sign(Algorithm.HMAC256(secret))
+
     routing {
 
+        /////////////////////////////////////////////////////////////
+        // GENERAL
+        /////////////////////////////////////////////////////////////
+
         get("/") {
-            call.respondText("## WELCOME on KTOR-SVELTY V.0.0.1\n" +
-                    "To display the most useful CLI, please go to «/help»", ContentType.Text.Plain, HttpStatusCode.OK)
+            call.respondText(
+                "## WELCOME on KTOR-SVELTY V.0.0.1\n" +
+                        "To display the most useful CLI, please go to «/help»",
+                ContentType.Text.Plain,
+                HttpStatusCode.OK
+            )
         }
 
         get("/help") {
-            call.respondText("## HELP\nIn this version: routes available are:\n" +
-                    "- /track (GET) It requires an id as parameter.\n" +
-                    "- /track (POST) To create a new Track.\n" +
-                    "- /tracks (GET) To get all tracks recorded.")
+            call.respondText(
+                "## HELP\nIn this version: routes available are:\n" +
+                        "- /track (GET) It requires an id as parameter.\n" +
+                        "- /track (POST) To create a new Track.\n" +
+                        "- /tracks (GET) To get all tracks recorded."
+            )
         }
+
+        /////////////////////////////////////////////////////////////
+        // USERS
+        /////////////////////////////////////////////////////////////
+
+        get("/users") {
+            val heroes = dao.getAllHeroes()
+            if (heroes.isEmpty()) call.respond(HttpStatusCode.NoContent)
+            else call.respond(dao.getAllHeroes())
+        }
+
+        post("/register") {
+            val hero = call.receive<Hero>()
+            val credentials: Pair<String?, String?> = Pair(hero.login, hero.password)
+            if (credentials.first.isNullOrBlank() || credentials.second.isNullOrEmpty()) {
+                call.respond(
+                    HttpStatusCode.BadRequest,
+                    "Oops, something went wrong. Please try with a valid login and password."
+                )
+            } else {
+                val heroInserted: Hero? = dao.insertNewHero(null, null, credentials.first!!, credentials.second!!.hashPassword())
+                if (heroInserted?.id == null) call.respond(
+                    HttpStatusCode.InternalServerError,
+                    "Oops, something went wrong. Please, Try later."
+                )
+                else call.respond(HttpStatusCode.OK, "Welcome. Never forget, Triumph without peril, brings no glory!")
+            }
+        }
+
+
+
+        post("/login") {
+            val hero = call.receive<Hero>()
+            if (dao.findHeroByLogin(hero.login) == null) call.respond(
+                HttpStatusCode.NotFound,
+                "Oops, Something goes wrong. Please, check your login and/or your password."
+            )
+            call.respond(hashMapOf("token" to generateToken(hero.login), "login" to hero.login))
+        }
+
+        post("/quit") {
+            val hero = call.receive<Hero>()
+            if (dao.findHeroByLogin(hero.login) == null) call.respond(
+                HttpStatusCode.NotFound,
+                "Oops, Something goes wrong. Please, check your login and/or your password."
+            ) else {
+                if (dao.deleteHeroByLogin(hero.login)) {
+                    call.respond(HttpStatusCode.OK, "I hope you've reached your goal...")
+                } else {
+                    call.respond(
+                        HttpStatusCode.InternalServerError,
+                        "Oops, Something goes wrong... Please, try later..."
+                    )
+                }
+            }
+        }
+
+
+        /////////////////////////////////////////////////////////////
+        // TRACKS
+        /////////////////////////////////////////////////////////////
 
         get("/track") {
             val id: Int? = call.parameters["id"]?.toInt()
-            if (id == null) {
+            val userId: Int? = call.parameters["userid"]?.toInt()
+            if (id == null || userId == null) {
                 call.respond(HttpStatusCode.BadRequest)
             }
-            val track = dao.getTrack(id!!)
+            val track = dao.getTrack(id!!, userId!!)
             if (track != null) {
                 call.respond(track)
             } else {
@@ -40,8 +125,10 @@ fun Application.configureRouting() {
             }
         }
 
-        get("/tracks"){
-            call.respond(dao.allTracks())
+        get("/tracks") {
+            val userId: Int? = call.parameters["userId"]?.toInt()
+            if (userId == null) call.respond(HttpStatusCode.BadRequest)
+            else call.respond(dao.allTracks(userId))
         }
 
         post("/track") {
@@ -54,12 +141,13 @@ fun Application.configureRouting() {
                 requestBody.bottom,
                 requestBody.leg,
                 requestBody.createdAt,
-                requestBody.toSynchronize
+                requestBody.toSynchronize,
+                requestBody.userId
             )
             if (track != null) {
                 call.respond(track)
             } else {
-                call.respond("Une erreur a eu lieu lors de l'ajout de cette prise de poids")
+                call.respond("Oops, something went wrong. Please, try again.")
             }
         }
     }

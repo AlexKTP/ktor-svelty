@@ -1,15 +1,20 @@
 package ktp.fr.data.model.dao
 
-import kotlinx.coroutines.runBlocking
+import ktp.fr.data.model.Hero
+import ktp.fr.data.model.Heroes
 import ktp.fr.data.model.Track
 import ktp.fr.data.model.Tracks
 import ktp.fr.data.model.dao.DatabaseFactory.dbQuery
+import ktp.fr.utils.hashPassword
 import org.jetbrains.exposed.sql.*
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
-import java.time.Instant
-import java.util.*
 
 class DAOFacadeImpl : DAOFacade {
+
+
+    /////////////////////////////////////////////////////////////
+    // GENERAL
+    /////////////////////////////////////////////////////////////
 
     private fun resultRowToTrack(row: ResultRow) = Track(
         id = row[Tracks.id],
@@ -19,15 +24,30 @@ class DAOFacadeImpl : DAOFacade {
         bottom = row[Tracks.bottom],
         leg = row[Tracks.leg],
         createdAt = row[Tracks.createdAt],
-        toSynchronize = row[Tracks.toSynchronize]
+        toSynchronize = row[Tracks.toSynchronize],
+        userId = row[Tracks.userID]
     )
 
-    override suspend fun allTracks(): List<Track> = dbQuery {
-        Tracks.selectAll().map { resultRow -> resultRowToTrack(resultRow) }
+    private fun resultRowToHero(row: ResultRow) = Hero(
+        id = row[Heroes.id],
+        username = row[Heroes.userName].toString(),
+        login = row[Heroes.login].toString(),
+        password = row[Heroes.password].toString(),
+    )
+
+
+    /////////////////////////////////////////////////////////////
+    // TRACKS
+    /////////////////////////////////////////////////////////////
+
+    override suspend fun allTracks(userID: Int): List<Track> = dbQuery {
+        Tracks.select { Tracks.userID eq userID }
+            .map { resultRow -> resultRowToTrack(resultRow) }
+            .toList()
     }
 
-    override suspend fun getTrack(id: Int): Track? = dbQuery {
-        Tracks.select { Tracks.id eq id }
+    override suspend fun getTrack(id: Int, userID: Int): Track? = dbQuery {
+        Tracks.select { Tracks.id.eq(id) and Tracks.userID.eq(userID) }
             .map { resultRow -> resultRowToTrack(resultRow) }
             .singleOrNull()
     }
@@ -40,7 +60,8 @@ class DAOFacadeImpl : DAOFacade {
         bottom: Double?,
         leg: Double?,
         createdAt: Long,
-        toSynchronize: Int
+        toSynchronize: Int,
+        userID: Int
     ): Track? = dbQuery {
         val insertStatement = Tracks.insert {
             it[Tracks.weight] = weight
@@ -51,14 +72,55 @@ class DAOFacadeImpl : DAOFacade {
             it[Tracks.leg] = leg
             it[Tracks.createdAt] = createdAt
             it[Tracks.toSynchronize] = toSynchronize
+            it[Tracks.userID] = userID
         }
-        insertStatement.resultedValues?.singleOrNull()?.let {resultRow ->  resultRowToTrack(resultRow)}
+        insertStatement.resultedValues?.singleOrNull()?.let { resultRow -> resultRowToTrack(resultRow) }
 
     }
 
-    override suspend fun deleteTrack(id: Int): Boolean = dbQuery {
-        Tracks.deleteWhere { Tracks.id eq id } > 0
+    override suspend fun deleteTrack(id: Int, userID: Int): Boolean = dbQuery {
+        Tracks.deleteWhere { Tracks.id.eq(id) and Tracks.userID.eq(userID) } > 0
     }
+
+
+
+    /////////////////////////////////////////////////////////////
+    // HERO
+    /////////////////////////////////////////////////////////////
+
+    override suspend fun insertNewHero(id: Int?, username: String?, login: String, password: String): Hero? = dbQuery {
+        val insertStatement = Heroes.insert {
+            it[Heroes.userName] = username
+            it[Heroes.login] = login
+            it[Heroes.password] = password.hashPassword()
+        }
+        insertStatement.resultedValues?.singleOrNull()?.let { resultRow ->
+            resultRowToHero(resultRow)
+        }
+    }
+
+    override suspend fun getAllHeroes(): List<Hero> = dbQuery {
+        Heroes.selectAll()
+            .map { resultRow -> resultRowToHero(resultRow) }
+            .toList()
+    }
+
+    override suspend fun findHeroByUsername(username: String): Hero? = dbQuery {
+        Heroes.select(where = Heroes.userName eq username)
+            .map { resultRow -> resultRowToHero(resultRow) }
+            .firstOrNull()
+    }
+
+    override suspend fun findHeroByLogin(login: String): Hero? = dbQuery {
+        Heroes.select(where = Heroes.login eq login)
+            .map { resultRow -> resultRowToHero(resultRow) }
+            .firstOrNull()
+    }
+
+    override suspend fun deleteHeroByLogin(login: String): Boolean = dbQuery {
+        Heroes.deleteWhere { Heroes.login eq login } >-1
+    }
+
 }
 
 

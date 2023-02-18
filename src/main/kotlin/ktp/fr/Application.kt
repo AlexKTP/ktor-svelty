@@ -4,11 +4,11 @@ import io.ktor.server.application.*
 import io.ktor.server.engine.*
 import io.ktor.server.netty.*
 import ktp.fr.data.model.dao.DatabaseFactory
-import ktp.fr.plugins.*
+import ktp.fr.plugins.configureRouting
+import ktp.fr.plugins.configureSerialization
 
-fun main() {
-    embeddedServer(Netty, port = 8080, host = "0.0.0.0", module = Application::module)
-        .start(wait = true)
+fun main(args: Array<String>) {
+    embeddedServer(Netty, commandLineEnvironment(args = args)).start(wait = true)
 }
 
 fun Application.module() {
