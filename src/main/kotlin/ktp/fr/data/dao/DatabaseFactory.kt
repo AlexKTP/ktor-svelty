@@ -1,6 +1,7 @@
 package ktp.fr.data.model.dao
 
 import kotlinx.coroutines.Dispatchers
+import ktp.fr.data.model.Heroes
 import ktp.fr.data.model.Tracks
 import org.jetbrains.exposed.sql.Database
 import org.jetbrains.exposed.sql.SchemaUtils
@@ -13,7 +14,7 @@ object DatabaseFactory {
         val jdbcURL = "jdbc:h2:file:./build/db"
         val database = Database.connect(jdbcURL, driverClassName)
         transaction(database) {
-            SchemaUtils.create(Tracks)
+            SchemaUtils.create(Tracks, Heroes)
         }
     }
 
