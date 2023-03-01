@@ -2,6 +2,7 @@ plugins {
     id 'org.jetbrains.kotlin.jvm' version '1.8.10'
     id 'io.ktor.plugin' version '2.2.3'
     id 'org.jetbrains.kotlin.plugin.serialization' version '1.8.10'
+    id("org.jlleitschuh.gradle.ktlint") version "11.2.0"
 }
 
 group "ktp.fr"
@@ -21,7 +22,7 @@ dependencies {
     implementation "io.ktor:ktor-serialization-kotlinx-json-jvm:$ktor_version"
     implementation "io.ktor:ktor-server-netty-jvm:$ktor_version"
     implementation "ch.qos.logback:logback-classic:$logback_version"
-    implementation "com.h2database:h2:1.3.148"
+    implementation 'mysql:mysql-connector-java:8.0.11'
     implementation("org.jetbrains.exposed:exposed-core:0.40.1")
     implementation("org.jetbrains.exposed:exposed-dao:0.40.1")
     implementation("org.jetbrains.exposed:exposed-jdbc:0.40.1")
