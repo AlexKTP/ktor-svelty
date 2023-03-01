@@ -2,17 +2,23 @@ package ktp.fr.plugins
 
 import com.auth0.jwt.JWT
 import com.auth0.jwt.algorithms.Algorithm
-import io.ktor.http.*
-import io.ktor.server.application.*
-import io.ktor.server.request.*
-import io.ktor.server.response.*
-import io.ktor.server.routing.*
+import io.ktor.http.ContentType
+import io.ktor.http.HttpStatusCode
+import io.ktor.server.application.Application
+import io.ktor.server.application.call
+import io.ktor.server.request.receive
+import io.ktor.server.response.respond
+import io.ktor.server.response.respondText
+import io.ktor.server.routing.get
+import io.ktor.server.routing.post
+import io.ktor.server.routing.routing
+import java.util.Date
+
 import ktp.fr.data.model.Hero
 import ktp.fr.data.model.Track
 import ktp.fr.data.model.dao.DAOFacade
 import ktp.fr.data.model.dao.DAOFacadeImpl
 import ktp.fr.utils.hashPassword
-import java.util.*
 
 fun Application.configureRouting() {
 

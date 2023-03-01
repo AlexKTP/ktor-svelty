@@ -6,15 +6,15 @@ import ktp.fr.data.model.Track
 import ktp.fr.data.model.Tracks
 import ktp.fr.data.model.dao.DatabaseFactory.dbQuery
 import ktp.fr.utils.hashPassword
-import org.jetbrains.exposed.sql.*
+import org.jetbrains.exposed.sql.ResultRow
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
+import org.jetbrains.exposed.sql.and
+import org.jetbrains.exposed.sql.deleteWhere
+import org.jetbrains.exposed.sql.insert
+import org.jetbrains.exposed.sql.select
+import org.jetbrains.exposed.sql.selectAll
 
 class DAOFacadeImpl : DAOFacade {
-
-
-    /////////////////////////////////////////////////////////////
-    // GENERAL
-    /////////////////////////////////////////////////////////////
 
     private fun resultRowToTrack(row: ResultRow) = Track(
         id = row[Tracks.id],
@@ -34,11 +34,6 @@ class DAOFacadeImpl : DAOFacade {
         login = row[Heroes.login].toString(),
         password = row[Heroes.password].toString(),
     )
-
-
-    /////////////////////////////////////////////////////////////
-    // TRACKS
-    /////////////////////////////////////////////////////////////
 
     override suspend fun allTracks(userID: Int): List<Track> = dbQuery {
         Tracks.select { Tracks.userID eq userID }
@@ -75,18 +70,11 @@ class DAOFacadeImpl : DAOFacade {
             it[Tracks.userID] = userID
         }
         insertStatement.resultedValues?.singleOrNull()?.let { resultRow -> resultRowToTrack(resultRow) }
-
     }
 
-    override suspend fun deleteTrack(id: Int, userID: Int): Boolean = dbQuery {
+    override suspend fun deleteTrack(id: Int, userID: Int) = dbQuery {
         Tracks.deleteWhere { Tracks.id.eq(id) and Tracks.userID.eq(userID) } > 0
     }
-
-
-
-    /////////////////////////////////////////////////////////////
-    // HERO
-    /////////////////////////////////////////////////////////////
 
     override suspend fun insertNewHero(id: Int?, username: String?, login: String, password: String): Hero? = dbQuery {
         val insertStatement = Heroes.insert {
