@@ -11,6 +11,6 @@ fun String.checkPassword(password: String, hashedPassword: String): Boolean {
     return BCrypt.checkpw(password, hashedPassword)
 }
 
-fun String.salt() : String {
+fun String.salt(): String {
     return BCrypt.gensalt(10)
 }

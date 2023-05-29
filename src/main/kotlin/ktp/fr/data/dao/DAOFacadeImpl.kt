@@ -5,7 +5,6 @@ import ktp.fr.data.model.Heroes
 import ktp.fr.data.model.Track
 import ktp.fr.data.model.Tracks
 import ktp.fr.data.model.dao.DatabaseFactory.dbQuery
-import ktp.fr.utils.hashPassword
 import org.jetbrains.exposed.sql.ResultRow
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
 import org.jetbrains.exposed.sql.and
@@ -106,7 +105,7 @@ class DAOFacadeImpl : DAOFacade {
     }
 
     override suspend fun deleteHeroByLogin(login: String): Boolean = dbQuery {
-        Heroes.deleteWhere { Heroes.login eq login } >-1
+        Heroes.deleteWhere { Heroes.login eq login } > -1
     }
 
 }
