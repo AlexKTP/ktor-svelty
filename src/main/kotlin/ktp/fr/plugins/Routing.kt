@@ -13,12 +13,18 @@ import io.ktor.server.routing.get
 import io.ktor.server.routing.post
 import io.ktor.server.routing.routing
 import java.util.Date
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.withContext
 
 import ktp.fr.data.model.Hero
 import ktp.fr.data.model.Track
 import ktp.fr.data.model.dao.DAOFacade
 import ktp.fr.data.model.dao.DAOFacadeImpl
+import ktp.fr.utils.checkPassword
 import ktp.fr.utils.hashPassword
+import ktp.fr.utils.salt
+import org.mindrot.jbcrypt.BCrypt
 
 fun Application.configureRouting() {
 
@@ -31,6 +37,12 @@ fun Application.configureRouting() {
         .withClaim("login", login)
         .withExpiresAt(Date(System.currentTimeMillis() + 60000))
         .sign(Algorithm.HMAC256(secret))
+
+    suspend fun verifyPassword(password: String, hashedPassword: String): Boolean = withContext(Dispatchers.Default) {
+        // Compare the provided password with the stored hashed password using BCrypt's checkpw function
+        BCrypt.checkpw(password, hashedPassword)
+    }
+
 
     routing {
 
@@ -88,12 +100,22 @@ fun Application.configureRouting() {
 
         post("/login") {
             val hero = call.receive<Hero>()
-            if (dao.findHeroByLogin(hero.login) == null) call.respond(
-                HttpStatusCode.NotFound,
-                "Oops, Something goes wrong. Please, check your login and/or your password."
-            )
-            call.respond(hashMapOf("token" to generateToken(hero.login), "login" to hero.login))
+            val storedHero = dao.findHeroByLogin(hero.login)
+            val check = verifyPassword(hero.password, storedHero!!.password)
+
+            if (storedHero == null || !check) {
+                call.respond(
+                    HttpStatusCode.Unauthorized,
+                    "Oops, Something goes wrong. Please, check your login and/or your password."
+                )
+            } else {
+                call.respond(
+                    hashMapOf("token" to generateToken(hero.login), "login" to hero.login)
+                )
+            }
         }
+
+
 
         post("/quit") {
             val hero = call.receive<Hero>()
@@ -156,5 +178,8 @@ fun Application.configureRouting() {
                 call.respond("Oops, something went wrong. Please, try again.")
             }
         }
+
+
     }
+
 }

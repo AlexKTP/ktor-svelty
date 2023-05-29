@@ -5,7 +5,7 @@ import org.jetbrains.exposed.sql.Table
 @kotlinx.serialization.Serializable
 data class Hero(
     val id: Int? = null,
-    val username: String? = null,
+    val username: String,
     val login: String,
     val password: String
 )

@@ -80,7 +80,7 @@ class DAOFacadeImpl : DAOFacade {
         val insertStatement = Heroes.insert {
             it[Heroes.userName] = username
             it[Heroes.login] = login
-            it[Heroes.password] = password.hashPassword()
+            it[Heroes.password] = password
         }
         insertStatement.resultedValues?.singleOrNull()?.let { resultRow ->
             resultRowToHero(resultRow)
