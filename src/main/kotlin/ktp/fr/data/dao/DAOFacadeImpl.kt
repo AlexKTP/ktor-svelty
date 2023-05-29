@@ -32,7 +32,7 @@ class DAOFacadeImpl : DAOFacade {
         id = row[Heroes.id],
         username = row[Heroes.userName].toString(),
         login = row[Heroes.login].toString(),
-        password = "",
+        password = row[Heroes.password].toString(),
         creationDate = row[Heroes.creationDate].toKotlinLocalDateTime(),
         lastModificationDate = row[Heroes.lastModificationDate].toKotlinLocalDateTime()
     )

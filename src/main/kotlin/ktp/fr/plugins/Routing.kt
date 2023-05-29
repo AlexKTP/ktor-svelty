@@ -2,6 +2,8 @@ package ktp.fr.plugins
 
 import com.auth0.jwt.JWT
 import com.auth0.jwt.algorithms.Algorithm
+import com.fasterxml.jackson.databind.ObjectMapper
+import com.fasterxml.jackson.databind.node.ObjectNode
 import io.ktor.http.ContentType
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.application.Application
@@ -21,9 +23,11 @@ import ktp.fr.data.model.Hero
 import ktp.fr.data.model.Track
 import ktp.fr.data.model.dao.DAOFacade
 import ktp.fr.data.model.dao.DAOFacadeImpl
+import ktp.fr.data.model.toJsonString
 import ktp.fr.utils.hashPassword
 import ktp.fr.validateToken
 import org.mindrot.jbcrypt.BCrypt
+
 
 fun Application.configureRouting() {
 
@@ -40,6 +44,12 @@ fun Application.configureRouting() {
     suspend fun verifyPassword(password: String, hashedPassword: String): Boolean = withContext(Dispatchers.Default) {
         // Compare the provided password with the stored hashed password using BCrypt's checkpw function
         BCrypt.checkpw(password, hashedPassword)
+    }
+
+    fun stringToJson(message:String): String {
+        val mapper = ObjectMapper()
+        val jsonNode: ObjectNode = mapper.createObjectNode()
+       return jsonNode.put("message", message).toPrettyString()
     }
 
 
@@ -73,16 +83,16 @@ fun Application.configureRouting() {
             if (credentials.first.isNullOrBlank() || credentials.second.isNullOrEmpty()) {
                 call.respond(
                     HttpStatusCode.BadRequest,
-                    "Oops, something went wrong. Please try with a valid login and password."
+                    stringToJson("Oops, something went wrong. Please try with a valid login and password.")
                 )
             } else {
                 val heroInserted: Hero? =
-                    dao.insertNewHero(null, null, credentials.first!!, credentials.second!!.hashPassword())
+                    dao.insertNewHero(null, hero.username, credentials.first!!, credentials.second!!.hashPassword())
                 if (heroInserted?.id == null) call.respond(
                     HttpStatusCode.InternalServerError,
-                    "Oops, something went wrong. Please, Try later."
+                    stringToJson("Oops, something went wrong. Please, Try later.")
                 )
-                else call.respond(HttpStatusCode.OK, "Welcome. Never forget, Triumph without peril, brings no glory!")
+                else call.respond(HttpStatusCode.OK, stringToJson("Welcome. Never forget, Triumph without peril, brings no glory!"))
             }
         }
 
@@ -96,11 +106,11 @@ fun Application.configureRouting() {
             if (storedHero == null || !check) {
                 call.respond(
                     HttpStatusCode.Unauthorized,
-                    "Oops, Something goes wrong. Please, check your login and/or your password."
+                    stringToJson("Oops, Something goes wrong. Please, check your login and/or your password.")
                 )
             } else {
                 call.respond(
-                    hashMapOf("token" to generateToken(hero.login), "login" to hero.login)
+                    hashMapOf("token" to generateToken(hero.login), "hero" to storedHero.toJsonString())
                 )
             }
         }
