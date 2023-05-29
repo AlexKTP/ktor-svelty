@@ -16,6 +16,7 @@ import io.ktor.server.response.respondText
 import io.ktor.server.routing.get
 import io.ktor.server.routing.post
 import io.ktor.server.routing.routing
+import java.time.ZoneId
 import java.util.Date
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -27,6 +28,9 @@ import ktp.fr.data.model.toJsonString
 import ktp.fr.utils.hashPassword
 import ktp.fr.validateToken
 import org.mindrot.jbcrypt.BCrypt
+import java.time.LocalDateTime as LocalTime
+
+
 
 
 fun Application.configureRouting() {
@@ -35,10 +39,14 @@ fun Application.configureRouting() {
 
     val secret = environment.config.property("jwt.secret").getString()
     val issuer = environment.config.property("jwt.issuer").getString()
+
+    val expirationDate = LocalTime.now().plusHours(24) // Add 24 hours from the current time
+    val expirationDateTime = expirationDate.atZone(ZoneId.systemDefault()).toInstant()
+
     fun generateToken(login: String): String = JWT.create()
         .withIssuer(issuer)
         .withClaim("login", login)
-        .withExpiresAt(Date(System.currentTimeMillis() + 60000))
+        .withExpiresAt(Date.from(expirationDateTime))
         .sign(Algorithm.HMAC256(secret))
 
     suspend fun verifyPassword(password: String, hashedPassword: String): Boolean = withContext(Dispatchers.Default) {
