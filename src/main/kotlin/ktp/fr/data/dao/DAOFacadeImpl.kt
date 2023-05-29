@@ -1,5 +1,6 @@
 package ktp.fr.data.model.dao
 
+import kotlinx.datetime.toKotlinLocalDateTime
 import ktp.fr.data.model.Hero
 import ktp.fr.data.model.Heroes
 import ktp.fr.data.model.Track
@@ -32,7 +33,9 @@ class DAOFacadeImpl : DAOFacade {
         id = row[Heroes.id],
         username = row[Heroes.userName].toString(),
         login = row[Heroes.login].toString(),
-        password = row[Heroes.password].toString(),
+        password = "",
+        creationDate = row[Heroes.creationDate].toKotlinLocalDateTime(),
+        lastModificationDate = row[Heroes.lastModificationDate].toKotlinLocalDateTime()
     )
 
     override suspend fun allTracks(userID: Int): List<Track> = dbQuery {
@@ -81,6 +84,8 @@ class DAOFacadeImpl : DAOFacade {
             it[Heroes.userName] = username
             it[Heroes.login] = login
             it[Heroes.password] = password.hashPassword()
+            it[Heroes.creationDate] = java.time.LocalDateTime.now()
+            it[Heroes.lastModificationDate] = java.time.LocalDateTime.now()
         }
         insertStatement.resultedValues?.singleOrNull()?.let { resultRow ->
             resultRowToHero(resultRow)
