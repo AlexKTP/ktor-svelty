@@ -7,11 +7,11 @@ import org.jetbrains.exposed.sql.javatime.datetime
 @kotlinx.serialization.Serializable
 data class Hero(
     val id: Int? = null,
-    val username: String? = null,
+    val username: String,
     val login: String,
     val password: String,
-    val creationDate: kotlinx.datetime.LocalDateTime,
-    val lastModificationDate: kotlinx.datetime.LocalDateTime
+    val creationDate: kotlinx.datetime.LocalDateTime?,
+    val lastModificationDate: kotlinx.datetime.LocalDateTime?
 )
 
 object Heroes : Table() {
