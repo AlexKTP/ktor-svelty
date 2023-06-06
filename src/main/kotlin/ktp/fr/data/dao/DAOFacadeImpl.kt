@@ -1,5 +1,12 @@
 package ktp.fr.data.model.dao
 
+<<<<<<< Updated upstream
+=======
+import java.time.ZoneOffset
+import kotlinx.datetime.toKotlinLocalDateTime
+import ktp.fr.data.model.Goal
+import ktp.fr.data.model.Goals
+>>>>>>> Stashed changes
 import ktp.fr.data.model.Hero
 import ktp.fr.data.model.Heroes
 import ktp.fr.data.model.Track
@@ -13,6 +20,7 @@ import org.jetbrains.exposed.sql.deleteWhere
 import org.jetbrains.exposed.sql.insert
 import org.jetbrains.exposed.sql.select
 import org.jetbrains.exposed.sql.selectAll
+import org.jetbrains.exposed.sql.update
 
 class DAOFacadeImpl : DAOFacade {
 
@@ -35,6 +43,13 @@ class DAOFacadeImpl : DAOFacade {
         password = row[Heroes.password].toString(),
     )
 
+    private fun resultRowToGoal(row: ResultRow) = Goal(
+        id = row[Goals.id],
+        weight = row[Goals.weight],
+        deadLine = row[Goals.deadLine],
+        userId = row[Goals.userID]
+    )
+
     override suspend fun allTracks(userID: Int): List<Track> = dbQuery {
         Tracks.select { Tracks.userID eq userID }
             .map { resultRow -> resultRowToTrack(resultRow) }
@@ -43,6 +58,12 @@ class DAOFacadeImpl : DAOFacade {
 
     override suspend fun getTrack(id: Int, userID: Int): Track? = dbQuery {
         Tracks.select { Tracks.id.eq(id) and Tracks.userID.eq(userID) }
+            .map { resultRow -> resultRowToTrack(resultRow) }
+            .singleOrNull()
+    }
+
+    override suspend fun getTrack(createdAt: Long, userID: Int): Track? = dbQuery {
+        Tracks.select { Tracks.createdAt.eq(createdAt) and Tracks.userID.eq(userID) }
             .map { resultRow -> resultRowToTrack(resultRow) }
             .singleOrNull()
     }
@@ -69,7 +90,36 @@ class DAOFacadeImpl : DAOFacade {
             it[Tracks.toSynchronize] = toSynchronize
             it[Tracks.userID] = userID
         }
-        insertStatement.resultedValues?.singleOrNull()?.let { resultRow -> resultRowToTrack(resultRow) }
+        val insertion = insertStatement.resultedValues?.singleOrNull()?.let { resultRow -> resultRowToTrack(resultRow) }
+        if (insertion != null) {
+            Heroes.update({ Heroes.id eq insertion.userId }) {
+                it[lastModificationDate] = java.time.LocalDateTime.now(ZoneOffset.UTC)
+            }
+        }
+        insertion
+    }
+
+    override suspend fun updateTrack(
+        id: Int,
+        weight: Double,
+        chest: Double?,
+        abs: Double?,
+        hip: Double?,
+        bottom: Double?,
+        leg: Double?,
+        userID: Int,
+        createdAt: Long
+    ): Track? = dbQuery {
+
+        Tracks.update({ Tracks.id.eq(id) and Tracks.userID.eq(userID) and Tracks.createdAt.eq(createdAt) }) {
+            it[Tracks.weight] = weight
+            it[Tracks.chest] = chest
+            it[Tracks.abs] = abs
+            it[Tracks.hip] = hip
+            it[Tracks.bottom] = bottom
+            it[Tracks.leg] = leg
+        }
+        getTrack(id, userID)
     }
 
     override suspend fun deleteTrack(id: Int, userID: Int) = dbQuery {
@@ -80,7 +130,13 @@ class DAOFacadeImpl : DAOFacade {
         val insertStatement = Heroes.insert {
             it[Heroes.userName] = username
             it[Heroes.login] = login
+<<<<<<< Updated upstream
             it[Heroes.password] = password.hashPassword()
+=======
+            it[Heroes.password] = password
+            it[Heroes.creationDate] = java.time.LocalDateTime.now(ZoneOffset.UTC)
+            it[Heroes.lastModificationDate] = java.time.LocalDateTime.now(ZoneOffset.UTC)
+>>>>>>> Stashed changes
         }
         insertStatement.resultedValues?.singleOrNull()?.let { resultRow ->
             resultRowToHero(resultRow)
@@ -108,6 +164,36 @@ class DAOFacadeImpl : DAOFacade {
     override suspend fun deleteHeroByLogin(login: String): Boolean = dbQuery {
         Heroes.deleteWhere { Heroes.login eq login } >-1
     }
+
+    override suspend fun getTargetUser(userID: Int): Goal? = dbQuery {
+        Goals.select { Goals.userID eq userID }
+            .map { resultRow -> resultRowToGoal(resultRow) }
+            .singleOrNull()
+    }
+
+    override suspend fun insertNewGoal( weight: Double, deadLine: Long, userID: Int): Goal? {
+        return dbQuery {
+            val insertStatement = Goals.insert {
+                it[Goals.weight] = weight
+                it[Goals.deadLine] = deadLine
+                it[Goals.userID] = userID
+            }
+            insertStatement.resultedValues?.singleOrNull()?.let { resultRow ->
+                resultRowToGoal(resultRow)
+            }
+        }
+    }
+
+    override suspend fun updateGoal(id: Int, weight: Double, deadLine: Long, userID: Int): Goal? {
+        return dbQuery {
+            Goals.update({ Goals.id eq id and(Goals.userID eq userID) }) {
+                it[Goals.weight] = weight
+                it[Goals.deadLine] = deadLine
+            }
+            getTargetUser(userID)
+        }
+    }
+
 
 }
 
