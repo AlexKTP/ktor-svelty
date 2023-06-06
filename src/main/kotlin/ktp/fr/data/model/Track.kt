@@ -24,7 +24,7 @@ object Tracks : Table() {
     val hip = double("hip").nullable()
     val bottom = double("bottom").nullable()
     val leg = double("leg").nullable()
-    val createdAt = long("created_ad")
+    val createdAt = long("created_at")
     val toSynchronize = integer("to_synchronize")
     val userID = integer("user_id").references(Heroes.id)
     override val primaryKey = PrimaryKey(id, name = "PK_Track_Id")
