@@ -31,6 +31,7 @@ interface DAOFacade {
         toSynchronize: Int,
         userID: Int
     ): Track?
+
     suspend fun deleteTrack(id: Int, userID: Int): Boolean
     suspend fun insertNewHero(id: Int?, username: String?, login: String, password: String): Hero?
     suspend fun getAllHeroes(): List<Hero>
@@ -43,6 +44,7 @@ interface DAOFacade {
         deadLine: Long,
         userID: Int
     ): Goal?
+
     suspend fun updateGoal(
         id: Int,
         weight: Double,
