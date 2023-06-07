@@ -16,6 +16,8 @@ import io.ktor.server.response.respondText
 import io.ktor.server.routing.get
 import io.ktor.server.routing.post
 import io.ktor.server.routing.routing
+import java.time.LocalDateTime as LocalTime
+import java.time.ZoneId
 import java.util.Date
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -24,6 +26,7 @@ import ktp.fr.data.model.Hero
 import ktp.fr.data.model.Track
 import ktp.fr.data.model.dao.DAOFacade
 import ktp.fr.data.model.dao.DAOFacadeImpl
+import ktp.fr.data.model.toJsonString
 import ktp.fr.utils.hashPassword
 import ktp.fr.validateToken
 import org.mindrot.jbcrypt.BCrypt
@@ -35,24 +38,26 @@ fun Application.configureRouting() {
 
     val secret = environment.config.property("jwt.secret").getString()
     val issuer = environment.config.property("jwt.issuer").getString()
+
+    val expirationDate = LocalTime.now().plusHours(24) // Add 24 hours from the current time
+    val expirationDateTime = expirationDate.atZone(ZoneId.systemDefault()).toInstant()
+
     fun generateToken(login: String): String = JWT.create()
         .withIssuer(issuer)
         .withClaim("login", login)
-        .withExpiresAt(Date(System.currentTimeMillis() + 60000))
+        .withExpiresAt(Date.from(expirationDateTime))
         .sign(Algorithm.HMAC256(secret))
-
 
     suspend fun verifyPassword(password: String, hashedPassword: String): Boolean = withContext(Dispatchers.Default) {
         // Compare the provided password with the stored hashed password using BCrypt's checkpw function
         BCrypt.checkpw(password, hashedPassword)
     }
 
-    fun stringToJson(message: String): String {
+    fun stringToJson(message:String): String {
         val mapper = ObjectMapper()
         val jsonNode: ObjectNode = mapper.createObjectNode()
         return jsonNode.put("message", message).toPrettyString()
     }
-
 
 
     routing {
@@ -108,29 +113,21 @@ fun Application.configureRouting() {
 
         post("/login") {
             val hero = call.receive<Hero>()
-            if (dao.findHeroByLogin(hero.login) == null) call.respond(
-                HttpStatusCode.NotFound,
-                "Oops, Something goes wrong. Please, check your login and/or your password."
-            )
-            call.respond(hashMapOf("token" to generateToken(hero.login), "login" to hero.login))
-        }
+            val storedHero = dao.findHeroByLogin(hero.login)
+            val check = verifyPassword(hero.password, storedHero!!.password)
 
-        post("/quit") {
-            val hero = call.receive<Hero>()
-            if (dao.findHeroByLogin(hero.login) == null) call.respond(
-                HttpStatusCode.NotFound,
-                "Oops, Something goes wrong. Please, check your login and/or your password."
-            ) else {
-                if (dao.deleteHeroByLogin(hero.login)) {
-                    call.respond(HttpStatusCode.OK, "I hope you've reached your goal...")
-                } else {
-                    call.respond(
-                        HttpStatusCode.InternalServerError,
-                        "Oops, Something goes wrong... Please, try later..."
-                    )
-                }
+            if (storedHero == null || !check) {
+                call.respond(
+                    HttpStatusCode.Unauthorized,
+                    stringToJson("Oops, Something goes wrong. Please, check your login and/or your password.")
+                )
+            } else {
+                call.respond(
+                    hashMapOf("token" to generateToken(hero.login), "hero" to storedHero.toJsonString())
+                )
             }
         }
+
 
 
         /////////////////////////////////////////////////////////////
