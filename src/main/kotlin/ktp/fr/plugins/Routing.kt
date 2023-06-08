@@ -13,10 +13,10 @@ import io.ktor.server.auth.authenticate
 import io.ktor.server.request.receive
 import io.ktor.server.response.respond
 import io.ktor.server.response.respondText
+import io.ktor.server.routing.Routing
 import io.ktor.server.routing.get
 import io.ktor.server.routing.post
 import io.ktor.server.routing.routing
-import java.time.LocalDateTime as LocalTime
 import java.time.ZoneId
 import java.util.Date
 import kotlinx.coroutines.Dispatchers
@@ -30,9 +30,14 @@ import ktp.fr.data.model.toJsonString
 import ktp.fr.utils.hashPassword
 import ktp.fr.validateToken
 import org.mindrot.jbcrypt.BCrypt
+import org.slf4j.Logger
+import org.slf4j.LoggerFactory
+import java.time.LocalDateTime as LocalTime
 
 
 fun Application.configureRouting() {
+
+    val logger: Logger = LoggerFactory.getLogger(Routing.javaClass)
 
     val dao: DAOFacade = DAOFacadeImpl()
 
@@ -53,7 +58,7 @@ fun Application.configureRouting() {
         BCrypt.checkpw(password, hashedPassword)
     }
 
-    fun stringToJson(message:String): String {
+    fun stringToJson(message: String): String {
         val mapper = ObjectMapper()
         val jsonNode: ObjectNode = mapper.createObjectNode()
         return jsonNode.put("message", message).toPrettyString()
@@ -90,6 +95,7 @@ fun Application.configureRouting() {
 
 
         post("/register") {
+            logger.debug("Registering a new user")
             val hero = call.receive<Hero>()
             val credentials: Pair<String?, String?> = Pair(hero.login, hero.password)
             if (credentials.first.isNullOrBlank() || credentials.second.isNullOrEmpty()) {
@@ -100,34 +106,41 @@ fun Application.configureRouting() {
             } else {
                 val heroInserted: Hero? =
                     dao.insertNewHero(null, null, credentials.first!!, credentials.second!!.hashPassword())
-                if (heroInserted?.id == null) call.respond(
-                    HttpStatusCode.InternalServerError,
-                    "Oops, something went wrong. Please, Try later."
-                )
-                else call.respond(
-                    HttpStatusCode.OK,
-                    stringToJson("Welcome. Never forget, Triumph without peril, brings no glory!")
-                )
+                if (heroInserted?.id == null) {
+                    logger.debug("Error while registering a new user")
+                    call.respond(
+                        HttpStatusCode.InternalServerError,
+                        "Oops, something went wrong. Please, Try later."
+                    )
+                } else {
+                    logger.debug("New user registered", heroInserted.id)
+                    call.respond(
+                        HttpStatusCode.OK,
+                        stringToJson("Welcome. Never forget, Triumph without peril, brings no glory!")
+                    )
+                }
             }
         }
 
         post("/login") {
+            logger.debug("Login a user")
             val hero = call.receive<Hero>()
             val storedHero = dao.findHeroByLogin(hero.login)
             val check = verifyPassword(hero.password, storedHero!!.password)
 
             if (storedHero == null || !check) {
+                logger.debug("Error while login a user")
                 call.respond(
                     HttpStatusCode.Unauthorized,
                     stringToJson("Oops, Something goes wrong. Please, check your login and/or your password.")
                 )
             } else {
+                logger.debug("User logged in", storedHero.id)
                 call.respond(
                     hashMapOf("token" to generateToken(hero.login), "hero" to storedHero.toJsonString())
                 )
             }
         }
-
 
 
         /////////////////////////////////////////////////////////////
@@ -145,6 +158,7 @@ fun Application.configureRouting() {
             }
 
             get("/users") {
+                logger.debug("Get all users")
                 val heroes = dao.getAllHeroes()
                 if (heroes.isEmpty()) call.respond(HttpStatusCode.NoContent)
                 else call.respond(dao.getAllHeroes())
@@ -156,6 +170,7 @@ fun Application.configureRouting() {
 
 
             post("/quit") {
+                logger.debug("Delete a user")
                 val hero = call.receive<Hero>()
                 if (dao.findHeroByLogin(hero.login) == null) call.respond(
                     HttpStatusCode.NotFound,
@@ -178,26 +193,37 @@ fun Application.configureRouting() {
             /////////////////////////////////////////////////////////////
 
             get("/track") {
+                logger.debug("Get a track")
                 val id: Int? = call.parameters["id"]?.toInt()
                 val userId: Int? = call.parameters["userid"]?.toInt()
                 if (id == null || userId == null) {
+                    logger.debug("Error while getting a track")
                     call.respond(HttpStatusCode.BadRequest)
                 }
                 val track = dao.getTrack(id!!, userId!!)
                 if (track != null) {
+                    logger.debug("Track found", track.id)
                     call.respond(track)
                 } else {
+                    logger.debug("Track not found", id)
                     call.respond(HttpStatusCode.NoContent)
                 }
             }
 
             get("/tracks") {
+                logger.debug("Get all tracks")
                 val userId: Int? = call.parameters["userId"]?.toInt()
-                if (userId == null) call.respond(HttpStatusCode.BadRequest)
-                else call.respond(dao.allTracks(userId))
+                if (userId == null) {
+                    logger.debug("Error while getting all tracks")
+                    call.respond(HttpStatusCode.BadRequest)
+                } else {
+                    logger.debug("All tracks found")
+                    call.respond(dao.allTracks(userId))
+                }
             }
 
             post("/track") {
+                logger.debug("Create a new track")
                 val requestBody = call.receive<Track>()
                 var track: Track? = dao.getTrack(requestBody.createdAt, requestBody.userId);
                 if (track == null) {
@@ -226,8 +252,10 @@ fun Application.configureRouting() {
                     )
                 }
                 if (track != null) {
+                    logger.debug("Track created", track.id)
                     call.respond(HttpStatusCode.OK, track)
                 } else {
+                    logger.debug("Error while creating a new track")
                     call.respond("Oops, something went wrong. Please, try again.")
                 }
             }
@@ -237,21 +265,27 @@ fun Application.configureRouting() {
             /////////////////////////////////////////////////////////////
 
             get("/target") {
+                logger.debug("Get a target")
                 val userId: Int? = call.parameters["userid"]?.toInt()
                 if (userId == null) {
+                    logger.debug("Error while getting a target")
                     call.respond(HttpStatusCode.BadRequest)
                 }
                 val target = dao.getTargetUser(userId!!)
                 if (target != null) {
+                    logger.debug("Target found", target.id)
                     call.respond(HttpStatusCode.OK, target)
                 } else {
+                    logger.debug("Target not found", userId)
                     call.respond(HttpStatusCode.NoContent)
                 }
             }
 
             post("/target") {
+                logger.debug("Create a new target")
                 val userId: Int? = call.parameters["userid"]?.toInt()
                 if (userId == null) {
+                    logger.debug("Error while creating a new target")
                     call.respond(HttpStatusCode.BadRequest)
                 }
                 val requestBody = call.receive<Goal>()
@@ -271,12 +305,15 @@ fun Application.configureRouting() {
                     )
                 }
                 if (goal != null) {
+                    logger.debug("Target created", goal.id)
                     call.respond(HttpStatusCode.OK, goal)
                 } else {
+                    logger.debug("Error while creating a new target")
                     call.respond("Oops, something went wrong. Please, try again.")
                 }
             }
         }
     }
 }
+
 
