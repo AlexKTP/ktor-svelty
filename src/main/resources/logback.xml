@@ -28,6 +28,10 @@
         <appender-ref ref="STDOUT"/>
     </root>
 
+    <logger name="Exposed" level="warn" additivity="false">
+        <appender-ref ref="STDOUT"/>
+    </logger>
+    <logger name="io.ktor.routing" level="warn" additivity="false"/>
     <logger name="org.eclipse.jetty" level="ERROR"/>
     <logger name="io.netty" level="ERROR"/>
 </configuration>
