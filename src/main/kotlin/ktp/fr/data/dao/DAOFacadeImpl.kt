@@ -156,6 +156,12 @@ class DAOFacadeImpl : DAOFacade {
             .firstOrNull()
     }
 
+    override suspend fun findHeroById(id: Int): Hero? = dbQuery {
+        Heroes.select(where = Heroes.id eq id)
+            .map { resultRow -> resultRowToHero(resultRow) }
+            .firstOrNull()
+    }
+
     override suspend fun deleteHeroByLogin(login: String): Boolean = dbQuery {
         Heroes.deleteWhere { Heroes.login eq login } > -1
     }
