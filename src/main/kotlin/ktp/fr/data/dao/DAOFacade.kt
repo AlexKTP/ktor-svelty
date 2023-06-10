@@ -37,6 +37,7 @@ interface DAOFacade {
     suspend fun getAllHeroes(): List<Hero>
     suspend fun findHeroByUsername(username: String): Hero?
     suspend fun findHeroByLogin(login: String): Hero?
+    suspend fun findHeroById(id: Int): Hero?
     suspend fun deleteHeroByLogin(login: String): Boolean
     suspend fun getTargetUser(userID: Int): Goal?
     suspend fun insertNewGoal(

@@ -17,6 +17,7 @@ import io.ktor.server.routing.Routing
 import io.ktor.server.routing.get
 import io.ktor.server.routing.post
 import io.ktor.server.routing.routing
+import java.time.Instant
 import java.time.ZoneId
 import java.util.Date
 import kotlinx.coroutines.Dispatchers
@@ -44,14 +45,15 @@ fun Application.configureRouting() {
     val secret = environment.config.property("jwt.secret").getString()
     val issuer = environment.config.property("jwt.issuer").getString()
 
-    val expirationDate = LocalTime.now().plusHours(24) // Add 24 hours from the current time
+    val expirationDate = LocalTime.now().plusMinutes(15)
     val expirationDateTime = expirationDate.atZone(ZoneId.systemDefault()).toInstant()
 
-    fun generateToken(login: String): String = JWT.create()
+    fun generateToken(login: String, expirationDate: Instant?): String = JWT.create()
         .withIssuer(issuer)
         .withClaim("login", login)
-        .withExpiresAt(Date.from(expirationDateTime))
+        .withExpiresAt(Date.from(expirationDate ?: expirationDateTime))
         .sign(Algorithm.HMAC256(secret))
+
 
     suspend fun verifyPassword(password: String, hashedPassword: String): Boolean = withContext(Dispatchers.Default) {
         // Compare the provided password with the stored hashed password using BCrypt's checkpw function
@@ -137,11 +139,37 @@ fun Application.configureRouting() {
             } else {
                 logger.debug("User logged in", storedHero.id)
                 call.respond(
-                    hashMapOf("token" to generateToken(hero.login), "hero" to storedHero.toJsonString())
+                    hashMapOf("token" to generateToken(hero.login, null), "hero" to storedHero.toJsonString())
                 )
             }
         }
 
+        post("/logout") {
+            logger.debug("Logout a user")
+            val userId: Int? = call.parameters["userId"]?.toInt()
+            val isPresent = userId != null
+            if(!isPresent){
+                call.respond(
+                    HttpStatusCode.BadRequest,
+                    stringToJson("Oops, Something goes wrong. Please, check your login and/or your password.")
+                )
+            }
+            val storedHero = dao.findHeroById(userId!!)
+            if(storedHero != null){
+                logger.debug("User logged out", storedHero.id)
+                call.respond(
+                    HttpStatusCode.OK,
+                    hashMapOf("token" to generateToken(storedHero.login, Instant.now().minusSeconds(60)), "hero" to storedHero.toJsonString())
+                )
+            } else {
+                logger.debug("Error while logout a user")
+                call.respond(
+                    HttpStatusCode.Unauthorized,
+                    stringToJson("Oops, Something goes wrong. Please, check your login and/or your password.")
+                )
+            }
+
+        }
 
         /////////////////////////////////////////////////////////////
         // USERS
@@ -150,7 +178,7 @@ fun Application.configureRouting() {
         authenticate("auth-jwt") {
 
             intercept(ApplicationCallPipeline.Call) {
-                call.validateToken()
+               call.validateToken()
             }
 
             get("/token") {
@@ -186,6 +214,7 @@ fun Application.configureRouting() {
                     }
                 }
             }
+
 
 
             /////////////////////////////////////////////////////////////
