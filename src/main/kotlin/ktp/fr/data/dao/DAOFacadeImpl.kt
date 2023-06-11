@@ -11,6 +11,7 @@ import ktp.fr.data.model.Track
 import ktp.fr.data.model.Tracks
 import ktp.fr.data.model.dao.DatabaseFactory.dbQuery
 import org.jetbrains.exposed.sql.ResultRow
+import org.jetbrains.exposed.sql.SortOrder
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
 import org.jetbrains.exposed.sql.and
 import org.jetbrains.exposed.sql.deleteWhere
@@ -50,7 +51,7 @@ class DAOFacadeImpl : DAOFacade {
     )
 
     override suspend fun allTracks(userID: Int): List<Track> = dbQuery {
-        Tracks.select { Tracks.userID eq userID }
+        Tracks.select { Tracks.userID eq userID  }.orderBy(Tracks.createdAt to SortOrder.ASC)
             .map { resultRow -> resultRowToTrack(resultRow) }
             .toList()
     }
