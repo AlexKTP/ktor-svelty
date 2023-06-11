@@ -1,7 +1,5 @@
 package ktp.fr.plugins
 
-import com.auth0.jwt.JWT
-import com.auth0.jwt.algorithms.Algorithm
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.databind.node.ObjectNode
 import io.ktor.http.ContentType
@@ -10,16 +8,17 @@ import io.ktor.server.application.Application
 import io.ktor.server.application.ApplicationCallPipeline
 import io.ktor.server.application.call
 import io.ktor.server.auth.authenticate
+import io.ktor.server.auth.authentication
+import io.ktor.server.auth.jwt.JWTPrincipal
 import io.ktor.server.request.receive
 import io.ktor.server.response.respond
 import io.ktor.server.response.respondText
-import io.ktor.server.routing.Routing
 import io.ktor.server.routing.get
 import io.ktor.server.routing.post
 import io.ktor.server.routing.routing
 import java.time.Instant
-import java.time.ZoneId
 import java.util.Date
+import javax.security.sasl.AuthenticationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import ktp.fr.data.model.Goal
@@ -28,32 +27,21 @@ import ktp.fr.data.model.Track
 import ktp.fr.data.model.dao.DAOFacade
 import ktp.fr.data.model.dao.DAOFacadeImpl
 import ktp.fr.data.model.toJsonString
+import ktp.fr.utils.expireSoon
+import ktp.fr.utils.generateToken
 import ktp.fr.utils.hashPassword
-import ktp.fr.validateToken
+import ktp.fr.utils.refreshToken
+import ktp.fr.utils.validateToken
 import org.mindrot.jbcrypt.BCrypt
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
-import java.time.LocalDateTime as LocalTime
 
 
 fun Application.configureRouting() {
 
-    val logger: Logger = LoggerFactory.getLogger(Routing.javaClass)
+    val logger: Logger = LoggerFactory.getLogger(javaClass)
 
     val dao: DAOFacade = DAOFacadeImpl()
-
-    val secret = environment.config.property("jwt.secret").getString()
-    val issuer = environment.config.property("jwt.issuer").getString()
-
-    val expirationDate = LocalTime.now().plusMinutes(15)
-    val expirationDateTime = expirationDate.atZone(ZoneId.systemDefault()).toInstant()
-
-    fun generateToken(login: String, expirationDate: Instant?): String = JWT.create()
-        .withIssuer(issuer)
-        .withClaim("login", login)
-        .withExpiresAt(Date.from(expirationDate ?: expirationDateTime))
-        .sign(Algorithm.HMAC256(secret))
-
 
     suspend fun verifyPassword(password: String, hashedPassword: String): Boolean = withContext(Dispatchers.Default) {
         // Compare the provided password with the stored hashed password using BCrypt's checkpw function
@@ -139,7 +127,10 @@ fun Application.configureRouting() {
             } else {
                 logger.debug("User logged in", storedHero.id)
                 call.respond(
-                    hashMapOf("token" to generateToken(hero.login, null), "hero" to storedHero.toJsonString())
+                    hashMapOf(
+                        "token" to call.generateToken(hero.login, null),
+                        "hero" to storedHero.toJsonString()
+                    )
                 )
             }
         }
@@ -148,18 +139,21 @@ fun Application.configureRouting() {
             logger.debug("Logout a user")
             val userId: Int? = call.parameters["userId"]?.toInt()
             val isPresent = userId != null
-            if(!isPresent){
+            if (!isPresent) {
                 call.respond(
                     HttpStatusCode.BadRequest,
                     stringToJson("Oops, Something goes wrong. Please, check your login and/or your password.")
                 )
             }
             val storedHero = dao.findHeroById(userId!!)
-            if(storedHero != null){
+            if (storedHero != null) {
                 logger.debug("User logged out", storedHero.id)
                 call.respond(
                     HttpStatusCode.OK,
-                    hashMapOf("token" to generateToken(storedHero.login, Instant.now().minusSeconds(60)), "hero" to storedHero.toJsonString())
+                    hashMapOf(
+                        "token" to call.generateToken(storedHero.login, Instant.now().minusSeconds(60)),
+                        "hero" to storedHero.toJsonString()
+                    )
                 )
             } else {
                 logger.debug("Error while logout a user")
@@ -182,7 +176,14 @@ fun Application.configureRouting() {
             }
 
             get("/token") {
-                call.respond(HttpStatusCode.OK)
+                val id: Int? = call.parameters["id"]?.toInt()
+                if(id ==null) {
+                    call.respond(HttpStatusCode.BadRequest)
+                }
+                val storedHero = dao.findHeroById(id!!)
+                if(call.expireSoon(Date.from(Instant.now()))){
+                    call.respond(HttpStatusCode.OK, hashMapOf("token" to call.refreshToken(storedHero!!.login)))
+                }else call.respond(HttpStatusCode.OK)
             }
 
             get("/users") {
@@ -190,6 +191,17 @@ fun Application.configureRouting() {
                 val heroes = dao.getAllHeroes()
                 if (heroes.isEmpty()) call.respond(HttpStatusCode.NoContent)
                 else call.respond(dao.getAllHeroes())
+            }
+
+            get("/user") {
+                logger.debug("Get a user")
+                val id: Int? = call.parameters["id"]?.toInt()
+                if (id == null) call.respond(HttpStatusCode.BadRequest)
+                else {
+                    val hero = dao.findHeroById(id)
+                    if (hero == null) call.respond(HttpStatusCode.NotFound)
+                    else call.respond(HttpStatusCode.OK, hero)
+                }
             }
 
 
@@ -214,7 +226,6 @@ fun Application.configureRouting() {
                     }
                 }
             }
-
 
 
             /////////////////////////////////////////////////////////////
@@ -254,7 +265,7 @@ fun Application.configureRouting() {
             post("/track") {
                 logger.debug("Create a new track")
                 val requestBody = call.receive<Track>()
-                var track: Track? = dao.getTrack(requestBody.createdAt, requestBody.userId);
+                var track: Track? = dao.getTrack(requestBody.createdAt, requestBody.userId)
                 if (track == null) {
                     track = dao.addNewTrack(
                         requestBody.weight,
@@ -318,7 +329,7 @@ fun Application.configureRouting() {
                     call.respond(HttpStatusCode.BadRequest)
                 }
                 val requestBody = call.receive<Goal>()
-                var goal: Goal? = dao.getTargetUser(userId!!);
+                var goal: Goal? = dao.getTargetUser(userId!!)
                 if (goal == null) {
                     goal = dao.insertNewGoal(
                         requestBody.weight,
@@ -344,5 +355,6 @@ fun Application.configureRouting() {
         }
     }
 }
+
 
 
