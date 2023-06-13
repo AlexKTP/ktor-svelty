@@ -6,6 +6,7 @@ import kotlinx.datetime.toKotlinLocalDateTime
 import ktp.fr.data.model.Goal
 import ktp.fr.data.model.Goals
 import ktp.fr.data.model.Hero
+import ktp.fr.data.model.HeroProfileDTO
 import ktp.fr.data.model.Heroes
 import ktp.fr.data.model.Track
 import ktp.fr.data.model.Tracks
@@ -16,8 +17,10 @@ import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
 import org.jetbrains.exposed.sql.and
 import org.jetbrains.exposed.sql.deleteWhere
 import org.jetbrains.exposed.sql.insert
+import org.jetbrains.exposed.sql.insertIgnore
 import org.jetbrains.exposed.sql.select
 import org.jetbrains.exposed.sql.selectAll
+import org.jetbrains.exposed.sql.transactions.transaction
 import org.jetbrains.exposed.sql.update
 
 class DAOFacadeImpl : DAOFacade {
@@ -51,7 +54,7 @@ class DAOFacadeImpl : DAOFacade {
     )
 
     override suspend fun allTracks(userID: Int): List<Track> = dbQuery {
-        Tracks.select { Tracks.userID eq userID  }.orderBy(Tracks.createdAt to SortOrder.ASC)
+        Tracks.select { Tracks.userID eq userID }.orderBy(Tracks.createdAt to SortOrder.ASC)
             .map { resultRow -> resultRowToTrack(resultRow) }
             .toList()
     }
@@ -163,6 +166,14 @@ class DAOFacadeImpl : DAOFacade {
             .firstOrNull()
     }
 
+    override suspend fun updateHeroUsername(id: Int, username: String?): Hero? = dbQuery {
+        Heroes.update({ Heroes.id eq id }) {
+            it[Heroes.userName] = username
+            it[lastModificationDate] = java.time.LocalDateTime.now(ZoneOffset.UTC)
+        }
+        findHeroById(id)
+    }
+
     override suspend fun deleteHeroByLogin(login: String): Boolean = dbQuery {
         Heroes.deleteWhere { Heroes.login eq login } > -1
     }
@@ -194,6 +205,51 @@ class DAOFacadeImpl : DAOFacade {
             }
             getTargetUser(userID)
         }
+    }
+
+    override suspend fun deleteGoal(id: Int, userID: Int): Boolean = dbQuery {
+        Goals.deleteWhere { Goals.id eq id and (Goals.userID eq userID) } > -1
+    }
+
+    override suspend fun getHeroGoal(userID: Int): Goal? = dbQuery {
+        Goals.select { Goals.userID eq userID }
+            .map { resultRow -> resultRowToGoal(resultRow) }
+            .singleOrNull()
+    }
+
+    override suspend fun updateHeroProfile(id: Int, username: String?, goal: Goal): HeroProfileDTO? {
+        transaction {
+            try {
+                if (username != null) {
+                    Heroes.update({ Heroes.id eq id }) {
+                        it[Heroes.userName] = username
+                        it[lastModificationDate] = java.time.LocalDateTime.now(ZoneOffset.UTC)
+                    }
+                }
+                if (goal.weight != null && goal.deadLine != null) {
+                    Goals.deleteWhere { Goals.userID eq id }
+                    Goals.insert(){
+                        it[Goals.weight] = goal.weight
+                        it[Goals.deadLine] = goal.deadLine /1000
+                        it[Goals.userID] = id}
+                }
+                commit()
+            } catch (e: Exception) {
+                rollback()
+                throw  Exception("Error updating hero profile")
+            }
+        }
+        val heroSaved = findHeroById(id)
+        val usernameStored = heroSaved?.username
+        val goalStored = getHeroGoal(id)
+        return HeroProfileDTO(id, usernameStored, goalStored)
+    }
+
+    override suspend fun getHeroProfile(id: Int): HeroProfileDTO = dbQuery {
+        val hero = findHeroById(id)
+        val username = hero?.username
+        val goal = getHeroGoal(id)
+        HeroProfileDTO(id, username, goal)
     }
 
 

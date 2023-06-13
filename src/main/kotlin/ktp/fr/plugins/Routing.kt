@@ -23,6 +23,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import ktp.fr.data.model.Goal
 import ktp.fr.data.model.Hero
+import ktp.fr.data.model.HeroProfileDTO
 import ktp.fr.data.model.Track
 import ktp.fr.data.model.dao.DAOFacade
 import ktp.fr.data.model.dao.DAOFacadeImpl
@@ -199,6 +200,37 @@ fun Application.configureRouting() {
                 if (id == null) call.respond(HttpStatusCode.BadRequest)
                 else {
                     val hero = dao.findHeroById(id)
+                    if (hero == null) call.respond(HttpStatusCode.NotFound)
+                    else call.respond(HttpStatusCode.OK, hero)
+                }
+            }
+
+            post("/updateUser") {
+                logger.debug("Update a user")
+                val hero = call.receive<HeroProfileDTO>()
+                val storedHero = dao.findHeroById(hero.id!!)
+                if (storedHero == null){
+                    call.respond(
+                        HttpStatusCode.NotFound,
+                        "Oops, Something goes wrong. Please, check your login and/or your password."
+                    )
+                } else {
+                    val heroUpdated = dao.updateHeroProfile(hero.id!!, hero.username, hero.goal!! )
+                    if (heroUpdated == null) call.respond(
+                        HttpStatusCode.InternalServerError,
+                        "Oops, Something goes wrong... Please, try later..."
+                    )
+                    else call.respond(HttpStatusCode.OK, heroUpdated)
+
+                }
+            }
+
+            get("/userProfile") {
+                logger.debug("Get a user profile")
+                val id: Int? = call.parameters["id"]?.toInt()
+                if (id == null) call.respond(HttpStatusCode.BadRequest)
+                else {
+                    val hero = dao.getHeroProfile(id)
                     if (hero == null) call.respond(HttpStatusCode.NotFound)
                     else call.respond(HttpStatusCode.OK, hero)
                 }

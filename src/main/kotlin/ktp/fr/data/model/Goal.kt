@@ -13,7 +13,7 @@ data class Goal(
 object Goals : Table() {
     val id = integer("id").autoIncrement()
     val weight = double("weight")
-    val deadLine = long("created_at")
+    val deadLine = long("dead_line")
     val userID = integer("user_id").references(Heroes.id)
     override val primaryKey = PrimaryKey(id, name = "PK_Target_Id")
 }

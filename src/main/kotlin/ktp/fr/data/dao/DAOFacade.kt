@@ -2,6 +2,7 @@ package ktp.fr.data.model.dao
 
 import ktp.fr.data.model.Goal
 import ktp.fr.data.model.Hero
+import ktp.fr.data.model.HeroProfileDTO
 import ktp.fr.data.model.Track
 
 interface DAOFacade {
@@ -38,6 +39,18 @@ interface DAOFacade {
     suspend fun findHeroByUsername(username: String): Hero?
     suspend fun findHeroByLogin(login: String): Hero?
     suspend fun findHeroById(id: Int): Hero?
+    suspend fun updateHeroUsername(
+        id: Int,
+        username: String?
+    ): Hero?
+
+    suspend fun updateHeroProfile(
+        id: Int,
+        username: String?,
+        goal: Goal
+    ): HeroProfileDTO?
+
+    suspend fun getHeroProfile(id: Int): HeroProfileDTO
     suspend fun deleteHeroByLogin(login: String): Boolean
     suspend fun getTargetUser(userID: Int): Goal?
     suspend fun insertNewGoal(
@@ -52,4 +65,7 @@ interface DAOFacade {
         deadLine: Long,
         userID: Int
     ): Goal?
+
+    suspend fun deleteGoal(id: Int, userID: Int): Boolean
+    suspend fun getHeroGoal(userID: Int): Goal?
 }
